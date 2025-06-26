@@ -21,10 +21,19 @@ return new class extends Migration
             $table->integer('power');
             $table->enum('condition', ['S', 'E', 'D', 'C'])
                 ->comment('S - хорошее качество, E - небольшие царапины, D - повреждение кузова, C - полное повреждение');
+
+            $table->enum('status', ['arrived', 'dismantling', 'dismantled', 'rejected'])
+                ->default('arrived')
+                ->comment('Статус автомобиля: только привезли, в разборке, разобран, отклонён');
+
+            $table->text('rejection_reason')->nullable()->comment('Причина отклонения автомобиля, если статус "rejected"');
+
             $table->json('damaged_parts')->nullable(); // Хранит массив поврежденных деталей
             $table->json('parts_for_sale')->nullable();
+
             $table->timestamps();
         });
+
     }
 
     /**

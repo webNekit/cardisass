@@ -17,6 +17,8 @@ class DismantledCar extends Model
         'mileage',
         'power',
         'condition',
+        'status',
+        'rejection_reason',
         'damaged_parts',
         'parts_for_sale',
     ];
@@ -38,6 +40,7 @@ class DismantledCar extends Model
     {
         return $this->belongsTo(CarBrand::class);
     }
+
     /**
      * Связь с запчастями, которые извлекли из этого авто.
      */
@@ -52,14 +55,25 @@ class DismantledCar extends Model
 
         static::saved(function ($car) {
             if (!empty($car->parts_for_sale)) {
-                // Удаляем старые записи, чтобы не дублировать запчасти
+                // Удаляем старые записи dismantled_parts для данного автомобиля
                 $car->dismantledParts()->delete();
 
                 foreach ($car->parts_for_sale as $partName) {
+                    // Добавляем новую запись dismantled_parts
                     $car->dismantledParts()->create([
                         'name' => $partName,
                         'quality' => $car->condition, // Качество по умолчанию = состоянию машины
                     ]);
+
+                    // ✅ Агрегированный учёт — добавляем или увеличиваем количество на складе
+                    $inventoryPart = \App\Models\InventoryPart::firstOrNew([
+                        'car_brand_id' => $car->car_brand_id,
+                        'model'        => $car->model,
+                        'name'         => $partName,
+                    ]);
+
+                    $inventoryPart->quantity += 1;
+                    $inventoryPart->save();
                 }
             }
         });

@@ -3,7 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\DismantledCarResource\Pages;
-use App\Filament\Resources\DismantledCarResource\RelationManagers;
+use App\Filament\Resources\DismantledCarResource\RelationManagers\DismantledPartsRelationManager;
 use App\Models\CarBrand;
 use App\Models\DismantledCar;
 use Filament\Forms;
@@ -18,8 +18,6 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class DismantledCarResource extends Resource
 {
@@ -49,7 +47,7 @@ class DismantledCarResource extends Resource
                         Fieldset::make('Данные об автомобиле')->schema([
                             TextInput::make('vin')
                                 ->label('VIN - номер')
-                                ->unique(DismantledCar::class, 'vin')
+                                ->unique(DismantledCar::class, 'vin', ignoreRecord:true)
                                 ->required(),
                             TextInput::make('mileage')
                                 ->label('Пробег')
@@ -69,6 +67,20 @@ class DismantledCarResource extends Resource
                                 'C' => 'Полное повреждение',
                             ])
                             ->required(),
+                        Select::make('status')
+                            ->label('Статус')
+                            ->options([
+                                'arrived' => 'Привезён',
+                                'dismantling' => 'В разборке',
+                                'dismantled' => 'Разобран',
+                                'rejected' => 'Отклонён',
+                            ])
+                            ->required()
+                            ->reactive(),
+                        TextInput::make('rejection_reason')
+                            ->label('Причина отклонения')
+                            ->visible(fn ($get) => $get('status') === 'rejected')
+                            ->required(fn ($get) => $get('status') === 'rejected'),
                     ]),
                     Section::make()->schema([
                         Fieldset::make()->schema([
@@ -113,24 +125,54 @@ class DismantledCarResource extends Resource
 
                 Tables\Columns\TextColumn::make('power')
                     ->label('Мощность'),
+
+                Tables\Columns\BadgeColumn::make('status')
+                    ->label('Статус')
+                    ->colors([
+                        'primary' => 'arrived',
+                        'warning' => 'dismantling',
+                        'success' => 'dismantled',
+                        'danger' => 'rejected',
+                    ])
+                    ->formatStateUsing(function (string $state): string {
+                        return match ($state) {
+                            'arrived' => 'Привезён',
+                            'dismantling' => 'В разборке',
+                            'dismantled' => 'Разобран',
+                            'rejected' => 'Отклонён',
+                            default => ucfirst($state),
+                        };
+                    }),
+
+                Tables\Columns\TextColumn::make('rejection_reason')
+                    ->label('Причина отклонения')
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                Tables\Filters\SelectFilter::make('status')
+                    ->label('Статус')
+                    ->options([
+                        'arrived' => 'Привезён',
+                        'dismantling' => 'В разборке',
+                        'dismantled' => 'Разобран',
+                        'rejected' => 'Отклонён',
+                    ]),
+                Tables\Filters\SelectFilter::make('car_brand_id')
+                    ->label('Марка авто')
+                    ->relationship('brand', 'name'),
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
+                Tables\Actions\DeleteBulkAction::make(),
             ]);
     }
 
     public static function getRelations(): array
     {
         return [
-            //
+            DismantledPartsRelationManager::class,
         ];
     }
 
